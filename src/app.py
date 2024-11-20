@@ -6,7 +6,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from decouple import config
 
-from src.utils.rag import get_answer_and_docs
+from src.utils.rag import get_answer_and_docs, get_llm_answer
 
 app = App("aien_api")
 app.image = Image.debian_slim().poetry_install_from_file("./pyproject.toml")
@@ -36,7 +36,8 @@ def endpoint():
     def qa(q: Question, token: HTTPAuthorizationCredentials = Depends(auth_scheme)):
         if token.credentials != config("AIEN_AUTH_TOKEN"):
             return JSONResponse(content={"error": "Incorrect bearer token"}, status_code=401)
-        response = get_answer_and_docs(question=q.question)
+        context_answer = get_llm_answer(question=q.question)
+        response = get_answer_and_docs(question=q.question, qa_context=context_answer)
         response_dict = {
             "question": q.question,
             "answer": response["answer"],

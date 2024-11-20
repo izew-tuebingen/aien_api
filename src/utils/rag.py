@@ -17,14 +17,28 @@ You are an AI Ethics Advisor specializing in ensuring ethical considerations in 
     Do not introduce information not found in the context provided. Never hallucinate!
 
 Context: {context}
-Question: {input}
+Question: {question}
 Answer:
 """
 
 prompt = ChatPromptTemplate.from_template(prompt_template)
 
+context_answer_template = """
+You are an AI Ethics Advisor specializing in ensuring ethical considerations in technological development.
+
+    You will be provided with a question from a researcher or developer working on a technological development project.
+    Please answer the question as truthfully and detailed as possible in one paragraph.
+    Repeat the question in your answer.
+
+Question: {question}
+Answer:
+"""
+
+context_prompt = ChatPromptTemplate.from_template(context_answer_template)
+
+
 llm = ChatGroq(temperature=0,
-                      model_name="mixtral-8x7b-32768",
+                      model_name="llama-3.1-70b-versatile",
                       api_key=config("GROQ_API_KEY"),)
 
 qdrant.VectorStore(collection_name="ai_ethics")
@@ -40,8 +54,18 @@ retrieval_qa_chain = create_retrieval_chain(
     combine_docs_chain=combine_docs_chain,
 )
 
-def get_answer_and_docs(question: str):
-    response = retrieval_qa_chain.invoke({"input": question})
+def get_llm_answer(question: str):
+    context_chain = context_prompt | llm
+    context_answer = context_chain.invoke(
+        {
+            "question": question
+        }
+    )
+    print(context_answer)
+    return context_answer.content
+
+def get_answer_and_docs(question: str, qa_context: str):
+    response = retrieval_qa_chain.invoke({"input": qa_context, "question": question})
     if response:
         #answer = response["response"].content
         answer = response["answer"]
@@ -55,6 +79,9 @@ def get_answer_and_docs(question: str):
             "answer": "No answer found",
             "context": "No context found"
         }
+    
+def get_docs_from_answer(question: str):
+    llm_answer = create_stuff_documents_chain.invoke({"input": question})
 
 
 # async def async_get_answer_and_docs(question: str):
