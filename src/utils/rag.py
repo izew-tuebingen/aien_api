@@ -38,10 +38,10 @@ context_prompt = ChatPromptTemplate.from_template(context_answer_template)
 
 
 llm = ChatGroq(temperature=0,
-                      model_name="llama-3.1-70b-versatile",
+                      model_name="llama-3.3-70b-versatile",
                       api_key=config("GROQ_API_KEY"),)
 
-qdrant.VectorStore(collection_name="ai_ethics")
+qdrant.VectorStore(collection_name="aien")
 # use vector_store.as_retriever to create a retriever and filter the documents for length of page_content
 retriever = qdrant.vector_store.as_retriever(search_kwargs={"k": 5})
 

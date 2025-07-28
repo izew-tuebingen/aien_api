@@ -19,6 +19,9 @@ langchain-community = "^0.2.16"
 langchain-groq = "^0.1.9"
 fastembed = "^0.3.6"
 python-dotenv = "^1.0.1"
+ipykernel = "^6.30.0"
+pandas = "^2.3.1"
+llama-parse = "^0.6.51"
 
 
 [build-system]
