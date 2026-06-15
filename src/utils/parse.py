@@ -64,36 +64,77 @@ def parse_pdf(pdf_content_path):
 
 # use langchain to split pdf text into chunks
 def chunk_document(doc, metadata):
-    # text_splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
-    #     model_name="text-embedding-ada-002",
-    #     chunk_size=500,
-    #     chunk_overlap=20,
-    # )
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=20)
-    all_splits = text_splitter.split_documents(doc)
+    """Split a document into chunks with metadata."""
+    if doc is None:
+        print("Warning: Received None as document for chunking.")
+        return []
+        
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+    try:
+        all_splits = text_splitter.split_documents(doc)
+    except Exception as e:
+        print(f"Error splitting document: {e}")
+        return []
 
     # Add json metadata to each chunk
-    for doc in all_splits:
+    for d in all_splits:
         for k, v in metadata.items():
-            doc.metadata[k] = v
+            d.metadata[k] = v
     
     return all_splits
 
 def parse_and_split_downloaded_documents(dirpath='data/documents', metadata_path='data/registered_documents.json'):
+    """Parse documents and split into chunks."""
     docs = []
     # load metadata
-    metadata = json.load(open(metadata_path))
-    for filename in os.listdir(dirpath):
-        print(filename)
-        if filename.endswith('.pdf'):
-            doc = parse_pdf(os.path.join(dirpath, filename))
-        elif filename.endswith('.html'):
-            doc = parse_html(os.path.join(dirpath, filename))
-        doc_chunks = chunk_document(doc, metadata[f'{filename.split(".")[0].split("_")[-1]}'])
-        # TODO: remove small chunks?
-        docs.extend(doc_chunks)
-    return docs
+    try:
+        with open(metadata_path, 'r') as f:
+            metadata = json.load(f)
+    except FileNotFoundError:
+        print(f"Metadata file {metadata_path} not found.")
+        return []
 
+    if not os.path.exists(dirpath):
+        return []
+
+    for filename in os.listdir(dirpath):
+        # Skip hidden files
+        if filename.startswith('.'):
+            continue
+            
+        file_path = os.path.join(dirpath, filename)
+        
+        # Skip empty files
+        if os.path.getsize(file_path) == 0:
+            print(f"Skipping empty file: {filename}")
+            continue
+            
+        print(f"DEBUG: Processing {filename}...")
+        
+        doc = None
+        if filename.endswith('.pdf'):
+            doc = parse_pdf(file_path)
+        elif filename.endswith('.html'):
+            doc = parse_html(file_path)
+        else:
+            continue
+
+        if not doc:
+            print(f"DEBUG: Document {filename} resulted in empty/None parse.")
+            continue
+
+        # Extract ID and split
+        try:
+            doc_id = filename.split(".")[0].split("_")[-1]
+            if doc_id in metadata:
+                doc_chunks = chunk_document(doc, metadata[doc_id])
+                docs.extend(doc_chunks)
+            else:
+                print(f"DEBUG: No metadata entry for {doc_id}")
+        except Exception as e:
+            print(f"Error processing {filename}: {e}")
+            
+    return docs
 
 # check if file is a pdf or html
 async def fetch_contenttype_from_url(session, url):
