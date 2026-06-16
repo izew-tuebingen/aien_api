@@ -16,8 +16,9 @@ def test():
     print("\n\n=== FULL TEXT OF SOURCE 1 ===")
     print(f"Document: {reranked_docs[0].metadata.get('document_name')}")
     print(reranked_docs[0].page_content)
+    print (reranked_docs[0].metadata)
     print("===============================\n\n")
 
 if __name__ == "__main__":
-    with modal.Retrying().run():
+    with app.run():
         test.remote()

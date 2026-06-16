@@ -1,10 +1,14 @@
 from modal import Image, App, asgi_app, Secret
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from decouple import config
+import httpx
+import modal
+
+from src.utils.rag import get_answer_and_docs, stream_answer_and_docs
 
 import os
 import sys
@@ -18,7 +22,6 @@ image = (Image
 )
 
 # Persistent high-performance storage for LanceDB & Documents
-import modal
 volume = modal.Volume.from_name("aien-vector-store", create_if_missing=True)
 
 app = App(
@@ -34,7 +37,7 @@ os.environ["FLASHRANK_CACHE"] = "/data/flashrank"
 
 auth_scheme = HTTPBearer()
 
-from src.utils.rag import get_answer_and_docs, stream_answer_and_docs
+
 
 @app.function(image=image)
 def debug_paths():
@@ -96,6 +99,36 @@ def endpoint():
                 yield f"data: {json.dumps(event)}\n\n"
 
         return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+    @app.post("/api/groq_proxy", description="Proxy requests to the Groq API")
+    async def groq_proxy(request: Request, token: HTTPAuthorizationCredentials = Depends(auth_scheme)):
+        if token.credentials != config("AIEN_AUTH_TOKEN"):
+            return JSONResponse(content={"error": "Incorrect bearer token"}, status_code=401)
+        
+        try:
+            body = await request.json()
+        except Exception:
+            return JSONResponse(content={"error": "Invalid JSON body"}, status_code=400)
+
+        groq_key = config("GROQ_API_KEY", default=None)
+        if not groq_key:
+            return JSONResponse(content={"error": "GROQ_API_KEY is not configured on the server"}, status_code=500)
+
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    json=body,
+                    headers={
+                        "Authorization": f"Bearer {groq_key}",
+                        "Content-Type": "application/json"
+                    },
+                    timeout=30.0
+                )
+                return JSONResponse(content=response.json(), status_code=response.status_code)
+            except Exception as e:
+                return JSONResponse(content={"error": str(e)}, status_code=500)
 
     return app
 

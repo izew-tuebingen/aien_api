@@ -86,10 +86,30 @@ def format_context(documents: list[Document]) -> str:
     formatted = []
     for i, doc in enumerate(documents, 1):
         source = doc.metadata.get("document_name", "Unknown")
-        page = doc.metadata.get("page", "N/A")
-        formatted.append(
-            f"[{i}] Source: \"{source}\", Page: {page}\n{doc.page_content}"
-        )
+        page = doc.metadata.get("page")
+        
+        # Clean page number
+        if page is not None:
+            page_str = str(page).strip()
+            if page_str.lower() in ("n/a", "null", "—", "-", ""):
+                page_str = None
+        else:
+            page_str = None
+            
+        link = doc.metadata.get("document_url") or doc.metadata.get("link") or "N/A"
+        if link and link != "N/A":
+            source_str = f'<a href="{link}">"{source}"</a>'
+        else:
+            source_str = f'"{source}"'
+            
+        if page_str:
+            formatted.append(
+                f"[{i}] Source: {source_str}, Page: {page_str}\n{doc.page_content}"
+            )
+        else:
+            formatted.append(
+                f"[{i}] Source: {source_str}\n{doc.page_content}"
+            )
     return "\n\n".join(formatted)
 
 
